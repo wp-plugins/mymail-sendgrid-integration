@@ -3,14 +3,14 @@
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
 Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 1.3.2 of the plugin
-Version: 0.1
+Version: 0.2
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.1');
+define('MYMAIL_SENDGRID_VERSION', '0.2');
 define('MYMAIL_SENDGRID_REQUIRED_VERSION', '1.3.2');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 define('MYMAIL_SENDGRID_DOMAIN', 'mymail-sendgrid');
@@ -417,7 +417,7 @@ function mymail_sendgrid_deactivate() {
  */
 function mymail_sendgrid_activation() {
 	if (defined('MYMAIL_VERSION') && version_compare(MYMAIL_SENDGRID_REQUIRED_VERSION, MYMAIL_VERSION, '<=')) {
-		mymail_notice(sprintf(__('Change the delivery method on the %s!', MYMAIL_SENDGRID_DOMAIN), '<a href="options-general.php?page=newsletter-settings#delivery">Settings Page</a>'), '', false, 'delivery_method');
+		mymail_notice(sprintf(__('Change the delivery method on the %s!', MYMAIL_SENDGRID_DOMAIN), '<a href="options-general.php?page=newsletter-settings&mymail_remove_notice=mymail_delivery_method#delivery">Settings Page</a>'), '', false, 'delivery_method');
 		mymail_sendgrid_reset();
 	}
 }
@@ -434,7 +434,7 @@ function mymail_sendgrid_deactivation() {
 	if (defined('MYMAIL_VERSION') && version_compare(MYMAIL_SENDGRID_REQUIRED_VERSION, MYMAIL_VERSION, '<=')) {
 		if(mymail_option('deliverymethod') == MYMAIL_SENDGRID_ID){
 			mymail_update_option('deliverymethod', 'simple');
-			mymail_notice(sprintf(__('Change the delivery method on the %s!', MYMAIL_SENDGRID_DOMAIN), '<a href="options-general.php?page=newsletter-settings#delivery">Settings Page</a>'), '', false, 'delivery_method');
+			mymail_notice(sprintf(__('Change the delivery method on the %s!', MYMAIL_SENDGRID_DOMAIN), '<a href="options-general.php?page=newsletter-settings&mymail_remove_notice=mymail_delivery_method#delivery">Settings Page</a>'), '', false, 'delivery_method');
 		}
 	}
 }
