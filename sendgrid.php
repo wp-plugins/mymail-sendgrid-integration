@@ -3,14 +3,14 @@
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
 Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 1.3.2 of the plugin
-Version: 0.2
+Version: 0.2.1
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.2');
+define('MYMAIL_SENDGRID_VERSION', '0.2.1');
 define('MYMAIL_SENDGRID_REQUIRED_VERSION', '1.3.2');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 define('MYMAIL_SENDGRID_DOMAIN', 'mymail-sendgrid');
@@ -36,7 +36,6 @@ function mymail_sendgrid_init() {
 
 	if (!defined('MYMAIL_VERSION') || version_compare(MYMAIL_SENDGRID_REQUIRED_VERSION, MYMAIL_VERSION, '>')) {
 		add_action('admin_notices', 'mymail_sendgrid_notice');
-		add_action('shutdown', 'mymail_sendgrid_deactivate');
 	}else {
 		add_filter('mymail_delivery_methods', 'mymail_sendgrid_delivery_method');
 		add_action('mymail_deliverymethod_tab_sendgrid', 'mymail_sendgrid_deliverytab');
@@ -116,12 +115,27 @@ function mymail_sendgrid_presend($mailobject) {
 				'api_user' => mymail_option(MYMAIL_SENDGRID_ID.'_user'),
 				'api_key' => mymail_option(MYMAIL_SENDGRID_ID.'_pwd'),
 				'headers' => $mailobject->headers,
+				'files' => array(),
+				'content' => array(),
 			);
 			
-			if($mailobject->embed_images){
+			//currenlty not working on some clients
+			if(false && $mailobject->embed_images){
 				
-				//currenlty not working on some clients
-				//$mailobject->sendgrid_object = wp_parse_args(mymail_sendgrid_embedd_images( $mailobject->make_img_relative($mailobject->content) ) , $mailobject->sendgrid_object);
+				$images = mymail_sendgrid_embedd_images( $mailobject->make_img_relative( $mailobject->content ) );
+				
+				$mailobject->sendgrid_object['files'] = wp_parse_args($images['files'] , $mailobject->sendgrid_object['files']);
+				$mailobject->sendgrid_object['content'] = wp_parse_args($images['content'] , $mailobject->sendgrid_object['content']);
+				
+			}
+			
+			if(!empty( $mailobject->attachments )){
+				
+				$attachments = mymail_sendgrid_attachments( $mailobject->attachments );
+				
+				$mailobject->sendgrid_object['files'] = wp_parse_args($attachments['files'] , $mailobject->sendgrid_object['files']);
+				$mailobject->sendgrid_object['content'] = wp_parse_args($attachments['content'] , $mailobject->sendgrid_object['content']);
+				
 			}
 			
 			//set pre_send to true if all is good
@@ -184,6 +198,32 @@ function mymail_sendgrid_reset() {
 
 
 
+/**
+ * mymail_sendgrid_attachments function.
+ * 
+ * prepares the array for attachemnts
+ * @access public
+ * @param mixed $message
+ * @return array
+ */
+function mymail_sendgrid_attachments($attachments) {
+	
+	$return = array(
+		'files' => array(),
+		'content' => array(),
+	);
+	
+	foreach($attachments as $attachment){
+		if(!file_exists($attachment)) continue;
+		$filename = basename($attachment);
+		
+		$return['files'][$filename] = file_get_contents($attachment);
+		$return['content'][$filename] = $filename;
+		
+	}
+	
+	return $return;
+}
 /**
  * mymail_sendgrid_embedd_images function.
  * 
@@ -395,17 +435,6 @@ function mymail_sendgrid_notice() {
 	<?php
 }
 
-
-/**
- * mymail_sendgrid_deactivate function.
- * 
- * deactivation function
- * @access public
- * @return void
- */
-function mymail_sendgrid_deactivate() {
-	deactivate_plugins( MYMAIL_SENDGRID_SLUG, false, is_network_admin() );
-}
 
 
 /**

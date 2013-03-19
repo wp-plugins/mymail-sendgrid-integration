@@ -2,8 +2,8 @@
 Contributors: revaxarts
 Tags: sendgrid, mymail, newsletter, email, revaxarts
 Requires at least: 3.3
-Tested up to: 3.5
-Stable tag: 0.2
+Tested up to: 3.5.1
+Stable tag: 0.2.1
 License: GPLv2 or later
 
 == Description ==
@@ -23,6 +23,9 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 == Screenshots ==
 
 == Changelog ==
+
+= 0.2.1 =
+* update to work with attachments
 
 = 0.2 =
 * small bug fixes
