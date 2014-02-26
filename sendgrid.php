@@ -2,16 +2,15 @@
 /*
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
-Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress.
-This requires at least version 1.3.2 of the plugin
-Version: 0.2.1
+Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 1.3.2 of the plugin
+Version: 0.2.2
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.2.1');
+define('MYMAIL_SENDGRID_VERSION', '0.2.2');
 define('MYMAIL_SENDGRID_REQUIRED_VERSION', '1.3.2');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 define('MYMAIL_SENDGRID_DOMAIN', 'mymail-sendgrid');
@@ -121,7 +120,7 @@ function mymail_sendgrid_presend($mailobject) {
 			);
 			
 			//currenlty not working on some clients
-			if(false && $mailobject->embed_images){
+			if(true && $mailobject->embed_images){
 				
 				$images = mymail_sendgrid_embedd_images( $mailobject->make_img_relative( $mailobject->content ) );
 				
@@ -360,12 +359,13 @@ function mymail_sendgrid_verify($user = '', $pwd = '') {
 	if (!$user) $user = mymail_option(MYMAIL_SENDGRID_ID.'_user');
 	if (!$pwd) $pwd = mymail_option(MYMAIL_SENDGRID_ID.'_pwd');
 	
+	$response = wp_remote_get( 'https://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd );
+	$body = wp_remote_retrieve_body($response);
+	$body = json_decode($body);
 	
-	$response = json_decode(wp_remote_retrieve_body(wp_remote_get( 'https://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd )));
-	
-	if(isset($response->error)){
+	if(isset($body->error)){
 		return false;
-	}else if(isset($response[0]->username)){
+	}else if(isset($body[0]->username)){
 		return true;
 	}
 	
@@ -413,6 +413,22 @@ function mymail_sendgrid_verify_options($options) {
 			if($timeoffset < time()) $timeoffset+(24*HOUR_IN_SECONDS);
 			wp_schedule_event($timeoffset, 'daily', 'mymail_sendgrid_cron');
 		}
+		
+		if(function_exists( 'fsockopen' ) && $options[MYMAIL_SENDGRID_ID.'_api'] == 'smtp'){
+			$host = 'smtp.sendgrid.net';
+			$port = isset($options[MYMAIL_SENDGRID_ID.'_secure']) && $options[MYMAIL_SENDGRID_ID.'_secure'] == 'tls' ? 587 : 465;
+			$conn = fsockopen($host, $port, $errno, $errstr, 5);
+			
+			if(!is_resource($conn)){
+				
+				fclose($conn);
+				
+			}else{
+				
+				add_settings_error( 'mymail_options', 'mymail_options', sprintf(__('Not able to use SendGrid with SMTP API cause of the blocked port %s! Please send with the WEB API or choose a different delivery method!', MYMAIL_SENDGRID_DOMAIN), $port) );
+				
+			}
+		}
 	}
 	
 	return $options;
@@ -430,7 +446,7 @@ function mymail_sendgrid_notice() {
 ?>
 <div id="message" class="error">
   <p>
-   <strong>SendGrid integration for MyMail</strong> requires the <a href="http://rxa.li/mymail">MyMail Newsletter Plugin</a>, at least version <strong><?php echo MYMAIL_SENDGRID_REQUIRED_VERSION?></strong>. Plugin deactivated.
+   <strong>SendGrid integration for MyMail</strong> requires the <a href="http://rxa.li/mymail?utm_source=SendGrid+integration+for+MyMail">MyMail Newsletter Plugin</a>, at least version <strong><?php echo MYMAIL_SENDGRID_REQUIRED_VERSION?></strong>. Plugin deactivated.
   </p>
 </div>
 	<?php
