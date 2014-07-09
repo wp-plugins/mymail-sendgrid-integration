@@ -18,10 +18,6 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 4. Enter your credentials
 5. Send a testmail
 
-== Frequently Asked Questions ==
-
-== Screenshots ==
-
 == Changelog ==
 
 = 0.2.3 =
