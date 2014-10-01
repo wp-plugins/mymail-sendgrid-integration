@@ -1,9 +1,9 @@
 === MyMail SendGrid Integration ===
 Contributors: revaxarts
-Tags: sendgrid, mymail, delivery, deliverymethod, newsletter, email, revaxarts
+Tags: sendgrid, mymail, delivery, deliverymethod, newsletter, email, revaxarts, mymailesp
 Requires at least: 3.3
-Tested up to: 3.9.1
-Stable tag: 0.2.3
+Tested up to: 4.0
+Stable tag: 0.2.4
 License: GPLv2 or later
 
 == Description ==
@@ -19,6 +19,9 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 5. Send a testmail
 
 == Changelog ==
+
+= 0.2.4 =
+* sending via SMTP is no faster
 
 = 0.2.3 =
 * fixed a bug where mails are not send at an early stage of the page load
