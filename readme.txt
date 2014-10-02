@@ -23,7 +23,7 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 == Changelog ==
 
 = 0.2.4 =
-* sending via SMTP is no faster
+* sending via SMTP is now faster
 
 = 0.2.3 =
 * fixed a bug where mails are not send at an early stage of the page load
