@@ -91,7 +91,7 @@ function mymail_sendgrid_initsend($mailobject) {
 /**
  * mymail_sendgrid_presend function.
  *
- * uses the mymail_presend hook to apply setttings before each mail
+ * uses the mymail_presend hook to apply settings before each mail
  * @access public
  * @param mixed $mailobject
  * @return void
@@ -228,7 +228,7 @@ function mymail_sendgrid_attachments($attachments) {
 /**
  * mymail_sendgrid_embedd_images function.
  * 
- * prepares the array for embedded iamges
+ * prepares the array for embedded images
  * @access public
  * @param mixed $message
  * @return array
@@ -256,7 +256,6 @@ function mymail_sendgrid_embedd_images($message) {
 				$directory = '';
 			}
 			$md5 = md5($url.time());
-			//$filename = $md5.'_'.$filename;
 			
 			$cid = $md5;
 			$return['html'] = str_replace($url, 'cid:' . $cid, $return['html']);
@@ -295,7 +294,6 @@ function mymail_sendgrid_deliverytab() {
 
 	$verified = mymail_option(MYMAIL_SENDGRID_ID.'_verified');
 	
-	 echo wp_timezone_override_offset();
 ?>
 	<table class="form-table">
 		<?php if(!$verified) { ?>
@@ -360,7 +358,9 @@ function mymail_sendgrid_verify($user = '', $pwd = '') {
 	if (!$user) $user = mymail_option(MYMAIL_SENDGRID_ID.'_user');
 	if (!$pwd) $pwd = mymail_option(MYMAIL_SENDGRID_ID.'_pwd');
 	
-	$response = wp_remote_get( 'https://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd );
+	$response = wp_remote_get( 'https://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd, array('sslverify' => true) );
+
+	echo '<pre>'.print_r($response, true).'</pre>';die();
 	$body = wp_remote_retrieve_body($response);
 	$body = json_decode($body);
 	
