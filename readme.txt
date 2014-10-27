@@ -44,5 +44,5 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 
 == Additional Info One ==
 
-This Plugin requires [MyMail Newsletter Plugin for WordPress](http://rxa.li/mymail)
+This Plugin requires [MyMail Newsletter Plugin for WordPress](http://rxa.li/mymail?utm_source=SendGrid+integration+for+MyMail)
 
