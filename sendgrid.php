@@ -3,14 +3,14 @@
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
 Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 1.3.2 of the plugin
-Version: 0.2.4
+Version: 0.2.5
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.2.4');
+define('MYMAIL_SENDGRID_VERSION', '0.2.5');
 define('MYMAIL_SENDGRID_REQUIRED_VERSION', '1.3.2');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 define('MYMAIL_SENDGRID_DOMAIN', 'mymail-sendgrid');
@@ -166,7 +166,10 @@ function mymail_sendgrid_dosend($mailobject) {
 				$mailobject->set_error(__('SendGrid options not defined', MYMAIL_SENDGRID_DOMAIN));
 				return false;
 			}
-			$response = json_decode( wp_remote_retrieve_body( wp_remote_post( 'https://sendgrid.com/api/mail.send.json', array(  'body' => $mailobject->sendgrid_object ) ) ) );
+			$response = json_decode( wp_remote_retrieve_body( wp_remote_post( 'https://sendgrid.com/api/mail.send.json', array(
+					'body' => $mailobject->sendgrid_object,
+					'sslverify' => false,
+			 ) ) ) );
 
 			//set errors if exists
 			if (isset($response->errors))
@@ -358,9 +361,8 @@ function mymail_sendgrid_verify($user = '', $pwd = '') {
 	if (!$user) $user = mymail_option(MYMAIL_SENDGRID_ID.'_user');
 	if (!$pwd) $pwd = mymail_option(MYMAIL_SENDGRID_ID.'_pwd');
 	
-	$response = wp_remote_get( 'https://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd, array('sslverify' => true) );
+	$response = wp_remote_get( 'https://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd, array('sslverify' => false) );
 
-	echo '<pre>'.print_r($response, true).'</pre>';die();
 	$body = wp_remote_retrieve_body($response);
 	$body = json_decode($body);
 	
