@@ -32,6 +32,8 @@ class MyMailSendGird{
 		
 		add_action( 'init', array( &$this, 'init'), 1 );
 	}
+
+	
 	 /*
 	 * init function.
 	 *
