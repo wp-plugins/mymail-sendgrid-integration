@@ -3,7 +3,7 @@ Contributors: revaxarts
 Tags: sendgrid, mymail, delivery, deliverymethod, newsletter, email, revaxarts, mymailesp
 Requires at least: 3.7
 Tested up to: 4.0
-Stable tag: 0.3
+Stable tag: 0.3.1
 License: GPLv2 or later
 
 == Description ==
@@ -21,6 +21,10 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 5. Send a testmail
 
 == Changelog ==
+
+= 0.3.1 =
+
+* secure settings now applies to WEB API as well
 
 = 0.3 =
 
