@@ -2,8 +2,8 @@
 Contributors: revaxarts
 Tags: sendgrid, mymail, delivery, deliverymethod, newsletter, email, revaxarts, mymailesp
 Requires at least: 3.7
-Tested up to: 4.0
-Stable tag: 0.3.1
+Tested up to: 4.22
+Stable tag: 0.4.0
 License: GPLv2 or later
 
 == Description ==
@@ -21,6 +21,13 @@ Uses SendGrid to deliver emails for the [MyMail Newsletter Plugin for WordPress]
 5. Send a testmail
 
 == Changelog ==
+
+= 0.4 =
+
+* fixed: bounce handling
+* change: requires now MyMail 2.0.25
+* added: option to select bounce handling (via MyMail or SendGrid)
+* added: option to add catagories to mails (X_SMTPAPI)
 
 = 0.3.1 =
 

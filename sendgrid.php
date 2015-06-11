@@ -3,15 +3,15 @@
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
 Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 1.3.2 of the plugin
-Version: 0.3.1
+Version: 0.4.0
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.3.1');
-define('MYMAIL_SENDGRID_REQUIRED_VERSION', '1.3.2');
+define('MYMAIL_SENDGRID_VERSION', '0.4.0');
+define('MYMAIL_SENDGRID_REQUIRED_VERSION', '2.0.25');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 
 
@@ -55,6 +55,9 @@ class MyMailSendGird{
 				add_action('mymail_presend', array(&$this, 'presend'));
 				add_action('mymail_dosend', array(&$this, 'dosend'));
 				add_action('mymail_sendgrid_cron', array(&$this, 'reset'));
+				add_action('mymail_cron_worker', array(&$this, 'check_bounces'), -1);
+				add_action('mymail_check_bounces', array(&$this, 'check_bounces'));
+				add_action('mymail_section_tab_bounce', array(&$this, 'section_tab_bounce'));
 			}
 		}
 		
@@ -72,7 +75,9 @@ class MyMailSendGird{
 	 */
 	public function initsend($mailobject) {
 
-		if (mymail_option(MYMAIL_SENDGRID_ID.'_api') == 'smtp') {
+		$method = mymail_option(MYMAIL_SENDGRID_ID.'_api');
+
+		if ($method == 'smtp') {
 
 			$secure = mymail_option(MYMAIL_SENDGRID_ID.'_secure');
 
@@ -86,7 +91,7 @@ class MyMailSendGird{
 			$mailobject->mailer->SMTPKeepAlive = true;
 
 
-		}else if (mymail_option(MYMAIL_SENDGRID_ID.'_api') == 'web') {
+		}else if ($method == 'web') {
 
 		}
 
@@ -106,30 +111,52 @@ class MyMailSendGird{
 	 */
 	public function presend($mailobject) {
 
-		if (mymail_option(MYMAIL_SENDGRID_ID.'_api') == 'smtp') {
+		$method = mymail_option(MYMAIL_SENDGRID_ID.'_api');
+		
+		$xsmtpapi['unique_args'] = array(
+			'subject' => $mailobject->subject,
+			'subscriberID' => $mailobject->subscriberID,
+			'campaignID' => $mailobject->campaignID,
+		);
+		$categories = mymail_option(MYMAIL_SENDGRID_ID.'_categories');
+		if(!empty($categories)){
+			$xsmtpapi['category'] = array_slice(array_map('trim', explode(',', $categories)), 0, 10);
+		}
 
+		if ($method == 'smtp') {
+
+
+			if(!empty($xsmtpapi)){
+				$mailobject->add_header('X-SMTPAPI', json_encode($xsmtpapi));
+			}
 			//use pre_send from the main class
 			$mailobject->pre_send();
 
-		}else if (mymail_option(MYMAIL_SENDGRID_ID.'_api') == 'web') {
+		}else if ($method == 'web') {
 				
 			//embedding images doesn't work
 			$mailobject->embed_images = false;
 
 			$mailobject->pre_send();
 
+			$headers = $mailobject->headers;
+
 			$mailobject->sendgrid_object = array(
 				'from' => $mailobject->from,
 				'fromname' => $mailobject->from_name,
+				'replyto' => $mailobject->reply_to,
+				//doesn't work right now
+				//'returnpath' => $mailobject->bouncemail,
 				'to' => $mailobject->to,
 				'subject' => $mailobject->subject,
 				'text' => $mailobject->mailer->AltBody,
 				'html' => $mailobject->mailer->Body,
 				'api_user' => mymail_option(MYMAIL_SENDGRID_ID.'_user'),
 				'api_key' => mymail_option(MYMAIL_SENDGRID_ID.'_pwd'),
-				'headers' => $mailobject->headers,
+				'headers' => json_encode($headers),
 				'files' => array(),
 				'content' => array(),
+				'x-smtpapi' => json_encode($xsmtpapi),
 			);
 			
 			//currently not working on some clients
@@ -165,20 +192,22 @@ class MyMailSendGird{
 	 * @return void
 	 */
 	public function dosend($mailobject) {
-		if (mymail_option(MYMAIL_SENDGRID_ID.'_api') == 'smtp') {
+		
+		$method = mymail_option(MYMAIL_SENDGRID_ID.'_api');
+		
+		if ($method == 'smtp') {
 
 			//use send from the main class
 			$mailobject->do_send();
 
-		}else if (mymail_option(MYMAIL_SENDGRID_ID.'_api') == 'web') {
+		}else if ($method == 'web') {
 
 			if (!isset($mailobject->sendgrid_object)) {
 				$mailobject->set_error(__('SendGrid options not defined', 'mymail_sendgrid'));
 				return false;
 			}
-			$response = json_decode( wp_remote_retrieve_body( wp_remote_post( 'http://sendgrid.com/api/mail.send.json', array(
-					'body' => $mailobject->sendgrid_object, 'sslverify' => mymail_option(MYMAIL_SENDGRID_ID.'_secure')
-			 ) ) ) );
+
+			$response = $this->do_call('mail.send', $mailobject->sendgrid_object, true);
 
 			//set errors if exists
 			if (isset($response->errors))
@@ -345,8 +374,23 @@ class MyMailSendGird{
 				</td>
 			</tr>
 			<tr valign="top">
+				<th scope="row"><?php _e('Categories' , 'mymail_sendgrid') ?></th>
+				<td><input type="text" name="mymail_options[<?php echo MYMAIL_SENDGRID_ID ?>_categories]" value="<?php echo esc_attr(mymail_option(MYMAIL_SENDGRID_ID.'_categories')); ?>" class="large-text">
+				<p class="howto"><?php echo sprintf(__('Define up to 10 %s, separated with commas which get send via SendGrid X-SMTPAPI' , 'mymail_sendgrid'), '<a href="https://sendgrid.com/docs/API_Reference/SMTP_API/categories.html" class="external">'.__('Categories', 'mymail_sendgrid').'</a>') ?></p>
+			</td>
+			</tr>
+			<tr valign="top">
 				<th scope="row"><?php _e('Secure Connection' , 'mymail_sendgrid') ?></th>
 				<td><label><input type="checkbox" name="mymail_options[<?php echo MYMAIL_SENDGRID_ID ?>_secure]" value="1" <?php checked(mymail_option( MYMAIL_SENDGRID_ID.'_secure'), true)?>> <?php _e('use secure connection', 'mymail_sendgrid'); ?></label></td>
+			</tr>
+			<tr valign="top">
+				<th scope="row"><?php _e('Bounce Handling via' , 'mymail_sendgrid') ?></th>
+				<td>
+				<select name="mymail_options[<?php echo MYMAIL_SENDGRID_ID ?>_bouncehandling]">
+					<option value="sendgrid" <?php selected(mymail_option( MYMAIL_SENDGRID_ID.'_bouncehandling'), 'sendgrid')?>>SendGrid</option>
+					<option value="mymail" <?php selected(mymail_option( MYMAIL_SENDGRID_ID.'_bouncehandling'), 'mymail')?>>MyMail</option>
+				</select> <span class="description"><?php _e('MyMail cannot handle bounces when the WEB API is used' , 'mymail_sendgrid') ?></span>
+				</td>
 			</tr>
 			<tr valign="top">
 				<th scope="row"><?php _e('DKIM' , 'mymail_sendgrid') ?></th>
@@ -368,17 +412,28 @@ class MyMailSendGird{
 	 */
 	public function verify($user = '', $pwd = '') {
 
+		$url = 'https://api.sendgrid.com/api/profile.get.json';
+		
 		if (!$user) $user = mymail_option(MYMAIL_SENDGRID_ID.'_user');
 		if (!$pwd) $pwd = mymail_option(MYMAIL_SENDGRID_ID.'_pwd');
-		
-		$response = wp_remote_get( 'http://sendgrid.com/api/profile.get.json?api_user='.$user.'&api_key='.$pwd, array('sslverify' => mymail_option(MYMAIL_SENDGRID_ID.'_secure')) );
 
-		$body = wp_remote_retrieve_body($response);
-		$body = json_decode($body);
+
+		$data = wp_parse_args($data, array(
+			'api_user' => $user,
+			'api_key' => $pwd,
+		));
+
+		$response = wp_remote_get( add_query_arg($data, $url), array(
+			'timeout' => 5,
+			'sslverify' => mymail_option(MYMAIL_SENDGRID_ID.'_secure'),
+		) );
+
+		$response = wp_remote_retrieve_body( $response );
+		$response = json_decode($response);
 		
-		if(isset($body->error)){
+		if(isset($response->error)){
 			return false;
-		}else if(isset($body[0]->username)){
+		}else if(isset($response[0]->username)){
 			return true;
 		}
 		
@@ -406,7 +461,7 @@ class MyMailSendGird{
 			$old_user = mymail_option(MYMAIL_SENDGRID_ID.'_user');
 			$old_pwd = mymail_option(MYMAIL_SENDGRID_ID.'_pwd');
 			
-			if (false || $old_user != $options[MYMAIL_SENDGRID_ID.'_user']
+			if ($old_user != $options[MYMAIL_SENDGRID_ID.'_user']
 				|| $old_pwd != $options[MYMAIL_SENDGRID_ID.'_pwd']
 				|| !mymail_option(MYMAIL_SENDGRID_ID.'_verified')) {
 				
@@ -427,31 +482,206 @@ class MyMailSendGird{
 				wp_schedule_event($timeoffset, 'daily', 'mymail_sendgrid_cron');
 			}
 			
-			if(function_exists( 'fsockopen' ) && $options[MYMAIL_SENDGRID_ID.'_api'] == 'smtp'){
-				$host = 'smtp.sendgrid.net';
-				$port = isset($options[MYMAIL_SENDGRID_ID.'_secure']) && $options[MYMAIL_SENDGRID_ID.'_secure'] == 'tls' ? 587 : 465;
-				$conn = fsockopen($host, $port, $errno, $errstr, 5);
-				
-				if(!is_resource($conn)){
+			if($options[MYMAIL_SENDGRID_ID.'_api'] == 'smtp'){
+				if(function_exists( 'fsockopen' )){
+					$host = 'smtp.sendgrid.net';
+					$port = isset($options[MYMAIL_SENDGRID_ID.'_secure']) && $options[MYMAIL_SENDGRID_ID.'_secure'] == 'tls' ? 587 : 465;
+					$conn = fsockopen($host, $port, $errno, $errstr, 15);
 					
-					fclose($conn);
-					
-				}else{
-					
-					add_settings_error( 'mymail_options', 'mymail_options', sprintf(__('Not able to use SendGrid with SMTP API cause of the blocked port %s! Please send with the WEB API or choose a different delivery method!', 'mymail_sendgrid'), $port) );
-					
+					if(is_resource($conn)){
+						
+						fclose($conn);
+						
+					}else{
+
+						add_settings_error( 'mymail_options', 'mymail_options', sprintf(__('Not able to use SendGrid with SMTP API cause of the blocked port %s! Please send with the WEB API or choose a different delivery method!', 'mymail_sendgrid'), $port) );
+						
+					}
 				}
+			}else{
+
+				if($options[MYMAIL_SENDGRID_ID.'_bouncehandling'] == 'mymail'){
+					add_settings_error( 'mymail_options', 'mymail_options', __('It is currently not possible to handle bounces with MyMail when using the WEB API', 'mymail_sendgrid') );
+					$options[MYMAIL_SENDGRID_ID.'_bouncehandling'] = 'sendgird';
+				}
+
 			}
+			
+			if($options[MYMAIL_SENDGRID_ID.'_bouncehandling'] == 'mymail'){
+				add_settings_error( 'mymail_options', 'mymail_options', sprintf(__('Please make sure your SendGrid Account "preserve headers" otherwise MyMail is not able to handle bounces', 'mymail_sendgrid'), $port) );
+			}
+
 		}
 		
 		return $options;
 	}
 
+	/**
+	 * check_bounces function.
+	 * 
+	 * checks for bounces and reset them if needed
+	 * @access public
+	 * @return void
+	 */
+	public function check_bounces() {
+
+		if ( get_transient( 'mymail_check_bounces_lock' ) || mymail_option( MYMAIL_SENDGRID_ID.'_bouncehandling') == 'mymail' ) return false;
+		
+		//check bounces only every five minutes
+		set_transient( 'mymail_check_bounces_lock', true, mymail_option('bounce_check', 5)*60 );
+			
+		$response = $this->do_call('bounces.get', array('date' => 1, 'limit' => 500));
+
+		if(is_wp_error($response)){
+		
+			$response->get_error_message();
+			//Stop if there was an error
+			return false;
+			
+		}
+
+		$bounces = $response->body;
+		
+		if(!empty($bounces)){
+		
+			foreach($bounces as $bounce){
+			
+				$subscriber = mymail('subscribers')->get_by_mail($bounce->email);
+
+				//only if user exists
+				if($subscriber){
+
+					$reseted = false;
+					$campaigns = mymail('subscribers')->get_sent_campaigns($subscriber->ID);
+
+					//any code with 5 eg 5.x.x
+					$is_hardbounce = intval($bounce->status) == 5;
+
+					foreach($campaigns as $i => $campaign){
+
+						//only the last 10 campaigns
+						if($i >= 10) break;
+
+						if(mymail('subscribers')->bounce($subscriber->ID, $campaign->campaign_id, $is_hardbounce)){
+							$response = $this->do_call('bounces.delete', array('email' => $bounce->email), true);
+							$reseted = isset($response->message) && $response->message == 'success';
+						}
+
+
+					}
+
+					if(!$reseted){
+						$response = $this->do_call('bounces.delete', array('email' => $bounce->email), true);
+						$reseted = isset($response->message) && $response->message == 'success';
+					}
+
+					
+				}else{
+					//remove user from the list
+					$response = $this->do_call('bounces.delete', array('email' => $bounce->email), true);
+					$count++;
+				}
+			}
+		}
+			
+	}
+
+
+	/**
+	 * do_call function.
+	 * 
+	 * makes a request to the sendgrid endpoint and returns the result
+	 * @access public
+	 * @param mixed $path
+	 * @param array $data (default: array())
+	 * @param bool $bodyonly (default: false)
+	 * @param int $timeout (default: 5)
+	 * @return void
+	 */
+	public function do_call($path, $data = array(), $bodyonly = false, $timeout = 5) {
+		
+		$url = 'https://api.sendgrid.com/api/'.$path.'.json';
+		if(is_bool($data)){
+			$bodyonly = $data;
+			$data = array();
+		}
+		
+		$user = mymail_option(MYMAIL_SENDGRID_ID.'_user');
+		$pwd = mymail_option(MYMAIL_SENDGRID_ID.'_pwd');
+
+		if($path == 'mail.send'){
+
+			$url = add_query_arg(array(
+				'api_user' => $user,
+				'api_key' => $pwd,
+			), $url);
+
+			$response = wp_remote_post( $url, array(
+				'timeout' => $timeout,
+				'sslverify' => mymail_option(MYMAIL_SENDGRID_ID.'_secure'),
+				'body' => $data
+			) );
+
+		}else{
+
+			$data = wp_parse_args($data, array(
+				'api_user' => $user,
+				'api_key' => $pwd,
+			));
+
+			$response = wp_remote_get( add_query_arg($data, $url), array(
+				'timeout' => $timeout,
+				'sslverify' => mymail_option(MYMAIL_SENDGRID_ID.'_secure'),
+			) );
+
+		}
+		
+		if(is_wp_error($response)){
+		
+			return $response;
+
+		}
+		
+		$code = wp_remote_retrieve_response_code($response);
+		$body = json_decode(wp_remote_retrieve_body($response));
+		
+		if($code != 200) return new WP_Error($body->name, $body->message);
+		
+		if($bodyonly) return $body;
+		
+		return (object) array(
+			'code' => $code,
+			'headers' => wp_remote_retrieve_headers($response),
+			'body' => $body,
+		);
+		
+		
+	}
+
+	/**
+	 * section_tab_bounce function.
+	 * 
+	 * displays a note on the bounce tab (MyMail >= 1.6.2)
+	 * @access public
+	 * @param mixed $options
+	 * @return void
+	 */
+	public function section_tab_bounce() {
+
+		if(mymail_option( MYMAIL_SENDGRID_ID.'_bouncehandling') == 'mymail') return;
+
+	?>
+		<div class="error inline"><p><strong><?php _e('Bouncing is handled by SendGrid so all your settings will be ignored', MYMAIL_SENDGRID_DOMAIN); ?></strong></p></div>
+
+	<?php
+	}
+
+
 
 	/**
 	 * notice function.
 	 * 
-	 * Notice if MyMail is not avaiable
+	 * Notice if MyMail is not available
 	 * @access public
 	 * @return void
 	 */
@@ -459,7 +689,7 @@ class MyMailSendGird{
 	?>
 	<div id="message" class="error">
 	  <p>
-	   <strong>SendGrid integration for MyMail</strong> requires the <a href="http://rxa.li/mymail?utm_source=SendGrid+integration+for+MyMail">MyMail Newsletter Plugin</a>, at least version <strong><?php echo MYMAIL_SENDGRID_REQUIRED_VERSION ?></strong>. Plugin deactivated.
+	   <strong>SendGrid integration for MyMail</strong> requires the <a href="http://rxa.li/mymail?utm_source=SendGrid+integration+for+MyMail">MyMail Newsletter Plugin</a>, at least version <strong><?php echo MYMAIL_SENDGRID_REQUIRED_VERSION ?></strong>.
 	  </p>
 	</div>
 		<?php
