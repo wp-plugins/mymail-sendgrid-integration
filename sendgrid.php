@@ -2,15 +2,15 @@
 /*
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
-Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 1.3.2 of the plugin
-Version: 0.4.0
+Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 2.0.25 of the plugin
+Version: 0.4
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.4.0');
+define('MYMAIL_SENDGRID_VERSION', '0.4');
 define('MYMAIL_SENDGRID_REQUIRED_VERSION', '2.0.25');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 

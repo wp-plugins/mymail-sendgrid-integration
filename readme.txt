@@ -2,8 +2,8 @@
 Contributors: revaxarts
 Tags: sendgrid, mymail, delivery, deliverymethod, newsletter, email, revaxarts, mymailesp
 Requires at least: 3.7
-Tested up to: 4.22
-Stable tag: 0.4.0
+Tested up to: 4.2.2
+Stable tag: 0.4
 License: GPLv2 or later
 
 == Description ==
