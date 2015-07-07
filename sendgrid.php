@@ -3,14 +3,14 @@
 Plugin Name: MyMail SendGrid Integration
 Plugin URI: http://rxa.li/mymail
 Description: Uses SendGrid to deliver emails for the MyMail Newsletter Plugin for WordPress. This requires at least version 2.0.25 of the plugin
-Version: 0.4
+Version: 0.4.2
 Author: revaxarts.com
 Author URI: http://revaxarts.com
 License: GPLv2 or later
 */
 
 
-define('MYMAIL_SENDGRID_VERSION', '0.4');
+define('MYMAIL_SENDGRID_VERSION', '0.4.2');
 define('MYMAIL_SENDGRID_REQUIRED_VERSION', '2.0.25');
 define('MYMAIL_SENDGRID_ID', 'sendgrid');
 
@@ -530,23 +530,37 @@ class MyMailSendGird{
 		//check bounces only every five minutes
 		set_transient( 'mymail_check_bounces_lock', true, mymail_option('bounce_check', 5)*60 );
 			
-		$response = $this->do_call('bounces.get', array('date' => 1, 'limit' => 500));
+		$collection = array();
 
-		if(is_wp_error($response)){
-		
-			$response->get_error_message();
-			//Stop if there was an error
-			return false;
-			
-		}
+		$response = $this->do_call('bounces.get', array('date' => 1, 'limit' => 200));
 
-		$bounces = $response->body;
+		if(is_wp_error($response)) return false;
+
+		$collection['bounces'] = (array) $response->body;
+
+		$response = $this->do_call('blocks.get', array('date' => 1, 'limit' => 200));
+
+		if(is_wp_error($response)) return false;
+
+		$collection['blocks'] = (array) $response->body;
+
+		$response = $this->do_call('spamreports.get', array('date' => 1, 'limit' => 200));
+
+		if(is_wp_error($response)) return false;
+
+		$collection['spamreports'] = (array) $response->body;
 		
-		if(!empty($bounces)){
+		$response = $this->do_call('unsubscribes.get', array('date' => 1, 'limit' => 200));
+
+		if(is_wp_error($response)) return false;
+
+		$collection['unsubscribes'] = (array) $response->body;
+
+		foreach($collection as $type => $messages){
 		
-			foreach($bounces as $bounce){
-			
-				$subscriber = mymail('subscribers')->get_by_mail($bounce->email);
+			foreach($messages as $message){
+
+				$subscriber = mymail('subscribers')->get_by_mail($message->email);
 
 				//only if user exists
 				if($subscriber){
@@ -554,33 +568,47 @@ class MyMailSendGird{
 					$reseted = false;
 					$campaigns = mymail('subscribers')->get_sent_campaigns($subscriber->ID);
 
-					//any code with 5 eg 5.x.x
-					$is_hardbounce = intval($bounce->status) == 5;
-
-					foreach($campaigns as $i => $campaign){
-
-						//only the last 10 campaigns
-						if($i >= 10) break;
-
-						if(mymail('subscribers')->bounce($subscriber->ID, $campaign->campaign_id, $is_hardbounce)){
-							$response = $this->do_call('bounces.delete', array('email' => $bounce->email), true);
+					if($type == 'unsubscribes'){
+							
+						if(mymail('subscribers')->unsubscribe($subscriber->ID, isset($campaigns[0]) ? $campaigns[0]->campaign_id : NULL)){
+							$response = $this->do_call($type.'.delete', array('email' => $message->email), true);
 							$reseted = isset($response->message) && $response->message == 'success';
 						}
 
+					
+					}else{
+
+						//any code with 5 eg 5.x.x or a spamreport
+						$is_hard_bounce = $type == 'spamreports' || substr($message->status,0,1) == 5;
+
+						foreach($campaigns as $i => $campaign){
+
+							//only the last 10 campaigns
+							if($i >= 10) break;
+
+							if(mymail('subscribers')->bounce($subscriber->ID, $campaign->campaign_id, $is_hard_bounce)){
+								$response = $this->do_call($type.'.delete', array('email' => $message->email), true);
+								$reseted = isset($response->message) && $response->message == 'success';
+							}
+
+
+						}
 
 					}
 
+
 					if(!$reseted){
-						$response = $this->do_call('bounces.delete', array('email' => $bounce->email), true);
+						$response = $this->do_call($type.'.delete', array('email' => $message->email), true);
 						$reseted = isset($response->message) && $response->message == 'success';
 					}
 
 					
 				}else{
 					//remove user from the list
-					$response = $this->do_call('bounces.delete', array('email' => $bounce->email), true);
+					$response = $this->do_call($type.'.delete', array('email' => $message->email), true);
 					$count++;
 				}
+
 			}
 		}
 			
